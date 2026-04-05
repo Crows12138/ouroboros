@@ -25,15 +25,22 @@
 ---
 
 ## 🔥🔥🔥 更新动态（太平洋时间）
-- 2026 年 4 月 3 日 06:00 PM：**v3.03** —— 任务管理系统（`task/` 包）：提供 `TaskCreate` / `TaskUpdate` / `TaskGet` / `TaskList` 工具，支持顺序 ID、依赖边（`blocks` / `blocked_by`）、元数据、持久化到 `.nano_claude/tasks.json`、线程安全存储、`/tasks` REPL 命令，以及 37 个新测试（**约 9500 行** Python 代码）。
-- 2026 年 4 月 3 日 02:50 PM：**v3.02** —— 插件系统（`plugin/` 包）：支持通过 `/plugin` CLI 进行安装 / 卸载 / 启用 / 禁用 / 更新；包含推荐引擎（关键词 + 标签匹配）、多作用域（用户 / 项目）、基于 git 的插件市场。新增 `AskUserQuestion` 工具：任务中途可交互式向用户提问，支持编号选项和自由文本输入（**约 8500 行** Python 代码）。
-- 2026 年 4 月 3 日 10:00 AM：**v3.01** —— 支持 MCP（Model Context Protocol，模型上下文协议）：新增 `mcp/` 包，支持 stdio + SSE + HTTP 传输、自动工具发现、`/mcp` 命令，以及 34 个新测试（**约 7000 行** Python 代码）。
-- 2026 年 4 月 2 日 12:20 PM：**v3.0** —— 多智能体包（`multi_agent/`）、记忆包（`memory/`）、技能包（`skill/`），内置技能、参数替换、fork/inline 执行、AI 记忆搜索、git worktree 隔离、智能体类型定义（**约 5000 行** Python 代码），详见 [更新说明](https://github.com/SafeRL-Lab/nano-claude-code/blob/main/docs/update_readme_v3.0.md)。
-- 2026 年 4 月 2 日 10:00 AM：**v2.0** —— 上下文压缩、记忆、子智能体、技能、diff 视图、工具插件系统（**约 3400 行** Python 代码）。
-- 2026 年 4 月 1 日 01:47 PM：支持 VLLM 推理（**约 2000 行** Python 代码）。
-- 2026 年 4 月 1 日 11:30 AM：支持更多**闭源模型**和**开源模型**：Claude、GPT、Gemini、Kimi、Qwen、Zhipu、DeepSeek，以及通过 Ollama 或任意 OpenAI 兼容端点接入的本地开源模型（**约 1700 行** Python 代码）。
-- 2026 年 4 月 1 日 09:50 AM：支持更多**闭源模型**：Claude、GPT、Gemini（**约 1300 行** Python 代码）。
-- 2026 年 4 月 1 日 08:23 AM：发布 Nano Claude Code 初始版本（**约 900 行** Python 代码）。
+* 2026年4月4日 晚上10:51：**v3.05_fix04** — 修复了 `/model` 和配置保存命令的崩溃问题；该问题是由于新引入的 `_run_query_callback` 被序列化进 JSON 所导致。同时还在 system prompt 中加入了 `SleepTimer` 的使用指引，使 agent 能够知道何时应主动调用后台定时器。
+* 2026年4月4日 晚上10:28：**v3.05_fix03** — 新增原生 `SleepTimer` 工具，使 agent 可以调度后台定时器，并在延迟一段时间后自主唤醒自己，无需用户再次提示。配套引入 `threading.Lock`，以防止后台与前台调用重叠时产生输出冲突。同时还包含多项跨平台修复：支持 Windows ANSI 颜色显示、让 Edit 工具兼容 CRLF 换行匹配、为 `/load` 提供交互式编号菜单、通过 `/api/chat` 原生支持 Ollama 流式输出，并按不同 provider 自动限制 `max_tokens`，以避免 API 报错。
+* 2026年4月4日 晚上08:31：**v3.05_fix** — 新增自动保存 + `/resume`：在执行 `/exit`、`/quit`、`Ctrl+C` 和 `Ctrl+D` 时，会自动将当前会话保存到 `mr_sessions/session_latest.json`。运行 `/resume` 可立即恢复最近一次会话，或使用 `/resume <file>` 加载 `mr_sessions/` 中的指定文件。同时进一步增强了对 API 和本地 Ollama 模型的支持（特别是 gemma4），并改进了 Windows 兼容性、会话管理交互体验，以及 Edit 工具的跨平台可靠性。
+* 2026年4月4日 凌晨00:41：**v3.05** — 语音输入（`voice/` 包）：录音后端支持 `sounddevice` → `arecord` → SoX，语音转文字后端支持 `faster-whisper` → `openai-whisper` → OpenAI API STT。可从 git 分支名、项目名和最近文件中智能提取关键词，作为 Whisper 的 `initial_prompt`，以提升编码领域识别准确率。新增 `/voice`、`/voice status`、`/voice lang <code>` REPL 命令。可在无 API key 的情况下完全离线运行。新增 29 个测试（**约 11.6K** 行 Python 代码）。
+* 2026年4月3日 晚上10:29：**v3.04** — 扩展工具覆盖范围：新增 `NotebookEdit`（编辑 Jupyter `.ipynb` 单元格，支持替换/插入/删除，并完整往返处理 JSON）和 `GetDiagnostics`（通过 pyright/mypy/flake8/tsc/shellcheck 提供类似 LSP 的诊断功能）。同时修复了 `_register_builtins` 中一个原有的 schema 索引 bug，改为基于名称查找（**约 10.5K** 行 Python 代码）。
+* 2026年4月3日 晚上06:00：**v3.03** — 任务管理系统（`task/` 包）：提供 `TaskCreate` / `TaskUpdate` / `TaskGet` / `TaskList` 工具，支持顺序 ID、依赖边（`blocks` / `blocked_by`）、元数据、持久化到 `.nano_claude/tasks.json`、线程安全存储，以及 `/tasks` REPL 命令。新增 37 个测试（**约 9500** 行 Python 代码）。
+* 2026年4月3日 下午02:50：**v3.02** — 插件系统（`plugin/` 包）：支持通过 `/plugin` CLI 进行安装/卸载/启用/禁用/更新，包含推荐引擎（关键词 + 标签匹配）、多作用域（用户/项目）以及基于 git 的插件市场。新增 `AskUserQuestion` 工具：可在任务执行中途与用户交互，支持编号选项和自由文本输入（**约 8500** 行 Python 代码）。
+* 2026年4月3日 上午10:00：**v3.01** — 支持 MCP（Model Context Protocol）：新增 `mcp/` 包，支持 stdio、SSE、HTTP 传输方式，自动发现工具，并加入 `/mcp` 命令，新增 34 个测试（**约 7000** 行 Python 代码）。
+* 2026年4月2日 中午12:20：**v3.0** — 新增多智能体包（`multi_agent/`）、记忆包（`memory/`）、技能包（`skill/`），包含内置技能、参数替换、fork/inline 执行、AI 记忆搜索、git worktree 隔离、agent 类型定义（**约 5000** 行 Python 代码），详见 [update](https://github.com/SafeRL-Lab/nano-claude-code/blob/main/docs/update_readme_v3.0.md)。
+* 2026年4月2日 上午10:00：**v2.0** — 支持上下文压缩、记忆、子 agent、技能、diff 视图、工具插件系统（**约 3400** 行 Python 代码）。
+* 2026年4月1日 下午01:47：支持 VLLM 推理（**约 2000** 行 Python 代码）。
+* 2026年4月1日 上午11:30：支持更多**闭源模型**和**开源模型**：Claude、GPT、Gemini、Kimi、Qwen、Zhipu、DeepSeek，以及通过 Ollama 或任意 OpenAI-compatible endpoint 接入的本地开源模型（**约 1700** 行 Python 代码）。
+* 2026年4月1日 上午09:50：支持更多**闭源模型**：Claude、GPT、Gemini（**约 1300** 行 Python 代码）。
+* 2026年4月1日 上午08:23：发布 Nano Claude Code 初始版本（**约 900 行** Python 代码）。
+
+
 
 ---
 

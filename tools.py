@@ -132,6 +132,181 @@ TOOL_SCHEMAS = [
             "required": ["query"],
         },
     },
+    # ── Task tools (schemas also listed here for Claude's tool list) ──────────
+    {
+        "name": "TaskCreate",
+        "description": (
+            "Create a new task in the task list. "
+            "Use this to track work items, to-dos, and multi-step plans."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "subject":     {"type": "string", "description": "Brief title"},
+                "description": {"type": "string", "description": "What needs to be done"},
+                "active_form": {"type": "string", "description": "Present-continuous label while in_progress"},
+                "metadata":    {"type": "object", "description": "Arbitrary metadata"},
+            },
+            "required": ["subject", "description"],
+        },
+    },
+    {
+        "name": "TaskUpdate",
+        "description": (
+            "Update a task: change status, subject, description, owner, "
+            "dependency edges, or metadata. "
+            "Set status='deleted' to remove. "
+            "Statuses: pending, in_progress, completed, cancelled, deleted."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id":       {"type": "string"},
+                "subject":       {"type": "string"},
+                "description":   {"type": "string"},
+                "status":        {"type": "string", "enum": ["pending","in_progress","completed","cancelled","deleted"]},
+                "active_form":   {"type": "string"},
+                "owner":         {"type": "string"},
+                "add_blocks":    {"type": "array", "items": {"type": "string"}},
+                "add_blocked_by":{"type": "array", "items": {"type": "string"}},
+                "metadata":      {"type": "object"},
+            },
+            "required": ["task_id"],
+        },
+    },
+    {
+        "name": "TaskGet",
+        "description": "Retrieve full details of a single task by ID.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string", "description": "Task ID to retrieve"},
+            },
+            "required": ["task_id"],
+        },
+    },
+    {
+        "name": "TaskList",
+        "description": "List all tasks with their status, owner, and pending blockers.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "NotebookEdit",
+        "description": (
+            "Edit a Jupyter notebook (.ipynb) cell. "
+            "Supports replace (modify existing cell), insert (add new cell after cell_id), "
+            "and delete (remove cell) operations. "
+            "Read the notebook with the Read tool first to see cell IDs."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "notebook_path": {
+                    "type": "string",
+                    "description": "Absolute path to the .ipynb notebook file",
+                },
+                "new_source": {
+                    "type": "string",
+                    "description": "New source code/text for the cell",
+                },
+                "cell_id": {
+                    "type": "string",
+                    "description": (
+                        "ID of the cell to edit. For insert, the new cell is inserted after this cell "
+                        "(or at the beginning if omitted). Use 'cell-N' (0-indexed) if no IDs are set."
+                    ),
+                },
+                "cell_type": {
+                    "type": "string",
+                    "enum": ["code", "markdown"],
+                    "description": "Cell type. Required for insert; defaults to current type for replace.",
+                },
+                "edit_mode": {
+                    "type": "string",
+                    "enum": ["replace", "insert", "delete"],
+                    "description": "replace (default) / insert / delete",
+                },
+            },
+            "required": ["notebook_path", "new_source"],
+        },
+    },
+    {
+        "name": "GetDiagnostics",
+        "description": (
+            "Get LSP-style diagnostics (errors, warnings, hints) for a source file. "
+            "Uses pyright/mypy/flake8 for Python, tsc for TypeScript/JavaScript, "
+            "and shellcheck for shell scripts. Returns structured diagnostic output."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Absolute or relative path to the file to diagnose",
+                },
+                "language": {
+                    "type": "string",
+                    "description": (
+                        "Override auto-detected language: python, javascript, typescript, "
+                        "shellscript. Omit to auto-detect from file extension."
+                    ),
+                },
+            },
+            "required": ["file_path"],
+        },
+    },
+    {
+        "name": "AskUserQuestion",
+        "description": (
+            "Pause execution and ask the user a clarifying question. "
+            "Use this when you need a decision from the user before proceeding. "
+            "Returns the user's answer as a string."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The question to ask the user.",
+                },
+                "options": {
+                    "type": "array",
+                    "description": "Optional list of choices. Each item: {label, description}.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label":       {"type": "string"},
+                            "description": {"type": "string"},
+                        },
+                        "required": ["label"],
+                    },
+                },
+                "allow_freetext": {
+                    "type": "boolean",
+                    "description": "If true (default), user may type a free-text answer instead of selecting an option.",
+                },
+            },
+            "required": ["question"],
+        },
+    },
+    {
+        "name": "SleepTimer",
+        "description": (
+            "Schedule a silent background timer. When the timer finishes, it injects an automated prompt into the chat history: "
+            "'(System Automated Event): The timer has finished...' so you can seamlessly wake up and execute deferred monitoring tasks."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "seconds": {"type": "integer", "description": "Number of seconds to sleep before waking up."}
+            },
+            "required": ["seconds"],
+        },
+    },
 ]
 
 # ── Safe bash commands (never ask permission) ───────────────────────────────
@@ -215,17 +390,25 @@ def _edit(file_path: str, old_string: str, new_string: str, replace_all: bool = 
     if not p.exists():
         return f"Error: file not found: {file_path}"
     try:
-        content = p.read_text()
-        count = content.count(old_string)
+        content = p.read_text(encoding="utf-8", errors="replace")
+        
+        # Normalize line endings to avoid \r\n vs \n mismatch on Windows
+        content_norm = content.replace("\r\n", "\n")
+        old_norm = old_string.replace("\r\n", "\n")
+        new_norm = new_string.replace("\r\n", "\n")
+        
+        count = content_norm.count(old_norm)
         if count == 0:
-            return "Error: old_string not found in file"
+            return "Error: old_string not found in file. Please ensure EXACT match, including all exact leading spaces/indentation and trailing newlines."
         if count > 1 and not replace_all:
             return (f"Error: old_string appears {count} times. "
                     "Provide more context to make it unique, or use replace_all=true.")
-        old_content = content
-        new_content = content.replace(old_string, new_string) if replace_all else \
-                      content.replace(old_string, new_string, 1)
-        p.write_text(new_content)
+                    
+        old_content = content_norm
+        new_content = content_norm.replace(old_norm, new_norm) if replace_all else \
+                      content_norm.replace(old_norm, new_norm, 1)
+                      
+        p.write_text(new_content, encoding="utf-8")
         filename = p.name
         diff = generate_unified_diff(old_content, new_content, filename)
         return f"Changes applied to {filename}:\n\n{diff}"
@@ -346,6 +529,22 @@ def drain_pending_questions() -> bool:
     return False
 
 
+def _sleeptimer(seconds: int, config: dict) -> str:
+    import threading
+    cb = config.get("_run_query_callback")
+    if not cb:
+        return "Error: Internal callback missing, nano_claude did not provide _run_query_callback"
+        
+    def worker():
+        import time
+        time.sleep(seconds)
+        cb("(System Automated Event): The timer has finished. Please wake up, perform any pending monitoring checks and report to the user now.")
+        
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+    return f"Timer successfully scheduled for {seconds} seconds. You can output your final thoughts and end your turn. You will be automatically awakened."
+
+
 # ── Dispatcher (backward-compatible wrapper) ──────────────────────────────
 
 def execute_tool(
@@ -452,6 +651,47 @@ def _register_builtins() -> None:
             schema=_schemas["WebSearch"],
             func=lambda p, c: _websearch(p["query"]),
             read_only=True,
+            concurrent_safe=True,
+        ),
+        ToolDef(
+            name="NotebookEdit",
+            schema=_schemas["NotebookEdit"],
+            func=lambda p, c: _notebook_edit(
+                p["notebook_path"],
+                p["new_source"],
+                p.get("cell_id"),
+                p.get("cell_type"),
+                p.get("edit_mode", "replace"),
+            ),
+            read_only=False,
+            concurrent_safe=False,
+        ),
+        ToolDef(
+            name="GetDiagnostics",
+            schema=_schemas["GetDiagnostics"],
+            func=lambda p, c: _get_diagnostics(
+                p["file_path"],
+                p.get("language"),
+            ),
+            read_only=True,
+            concurrent_safe=True,
+        ),
+        ToolDef(
+            name="AskUserQuestion",
+            schema=_schemas["AskUserQuestion"],
+            func=lambda p, c: _ask_user_question(
+                p["question"],
+                p.get("options"),
+                p.get("allow_freetext", True),
+            ),
+            read_only=True,
+            concurrent_safe=False,
+        ),
+        ToolDef(
+            name="SleepTimer",
+            schema=_schemas["SleepTimer"],
+            func=lambda p, c: _sleeptimer(p["seconds"], c),
+            read_only=False,
             concurrent_safe=True,
         ),
     ]

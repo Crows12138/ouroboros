@@ -41,8 +41,9 @@ PROVIDERS: dict[str, dict] = {
         "api_key_env": "OPENAI_API_KEY",
         "base_url":   "https://api.openai.com/v1",
         "context_limit": 128000,
+        "max_completion_tokens": 16384,  # safe cap across gpt-4o/gpt-4.1 family
         "models": [
-            "gpt-4o", "gpt-4o-mini", "gpt-4-turbo",
+            "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4.1", "gpt-4.1-mini",
             "o3-mini", "o1", "o1-mini",
         ],
     },
@@ -98,9 +99,9 @@ PROVIDERS: dict[str, dict] = {
         ],
     },
     "ollama": {
-        "type":       "openai",
+        "type":       "ollama",
         "api_key_env": None,
-        "base_url":   "http://localhost:11434/v1",
+        "base_url":   "http://localhost:11434",
         "api_key":    "ollama",
         "context_limit": 16384,
         "models": [
@@ -407,17 +408,29 @@ def stream_openai_compat(
         "messages": oai_messages,
         "stream":   True,
     }
+
+    # Pass num_ctx for local Ollama/LM Studio endpoints so conversation history isn't truncated
+    if "11434" in base_url or detect_provider(model) in ("ollama", "lmstudio"):
+        ctx_limit = PROVIDERS.get(detect_provider(model), {}).get("context_limit", 128000)
+        kwargs["extra_body"] = {"options": {"num_ctx": ctx_limit}}
+
     if tool_schemas and not config.get("no_tools"):
         kwargs["tools"] = tools_to_openai(tool_schemas)
         # "auto" requires vLLM --enable-auto-tool-choice; omit if server doesn't support it
         if not config.get("disable_tool_choice"):
             kwargs["tool_choice"] = "auto"
     if config.get("max_tokens"):
-        kwargs["max_tokens"] = config["max_tokens"]
+        prov_cap = PROVIDERS.get(detect_provider(model), {}).get("max_completion_tokens")
+        mt = config["max_tokens"]
+        kwargs["max_tokens"] = min(mt, prov_cap) if prov_cap else mt
 
     text          = ""
     tool_buf: dict = {}   # index → {id, name, args_str}
     in_tok = out_tok = 0
+
+    import json
+    with open("debug_payload.json", "w", encoding="utf-8") as _f:
+        _f.write(json.dumps(kwargs, indent=2, default=str))
 
     stream = client.chat.completions.create(**kwargs)
     for chunk in stream:
@@ -472,6 +485,87 @@ def stream_openai_compat(
     yield AssistantTurn(text, tool_calls, in_tok, out_tok)
 
 
+def stream_ollama(
+    base_url: str,
+    model: str,
+    system: str,
+    messages: list,
+    tool_schemas: list,
+    config: dict,
+) -> Generator:
+    import urllib.request
+    import json
+    
+    oai_messages = [{"role": "system", "content": system}] + messages_to_openai(messages)
+    
+    # Ollama requires tool arguments as dict objects, not strings. OpenAI uses strings.
+    for m in oai_messages:
+        if m.get("content") is None:
+            m["content"] = ""
+        if "tool_calls" in m and m["tool_calls"]:
+            for tc in m["tool_calls"]:
+                fn = tc.get("function", {})
+                if isinstance(fn.get("arguments"), str):
+                    try:
+                        fn["arguments"] = json.loads(fn["arguments"])
+                    except Exception:
+                        pass
+    
+    payload = {
+        "model": model,
+        "messages": oai_messages,
+        "stream": True,
+        "options": {
+            "num_ctx": config.get("context_limit", 128000)
+        }
+    }
+    
+    if tool_schemas and not config.get("no_tools"):
+        payload["tools"] = tools_to_openai(tool_schemas)
+
+    req = urllib.request.Request(
+        f"{base_url.rstrip('/')}/api/chat",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    
+    text = ""
+    tool_buf: dict = {}
+    
+    with urllib.request.urlopen(req) as resp:
+        for line in resp:
+            if not line.strip(): continue
+            try:
+                data = json.loads(line)
+            except Exception:
+                continue
+            
+            msg = data.get("message", {})
+            if "content" in msg and msg["content"]:
+                text += msg["content"]
+                yield TextChunk(msg["content"])
+            
+            # Handle native ollama tools format which mirrors OpenAI
+            for tc in msg.get("tool_calls", []):
+                fn = tc.get("function", {})
+                idx = len(tool_buf) # Ollama sends complete tool calls, not delta
+                tool_buf[idx] = {
+                    "id": "call_ollama" + str(idx),
+                    "name": fn.get("name", ""),
+                    "args": json.dumps(fn.get("arguments", {})),
+                    "input": fn.get("arguments", {})
+                }
+
+    tool_calls = []
+    for idx in sorted(tool_buf):
+        v = tool_buf[idx]
+        tool_calls.append({"id": v["id"], "name": v["name"], "input": v["input"]})
+
+    # Ollama doesn't return exact token counts via livestream easily until "done",
+    # but we can do a rough estimate or 0, nano_claude handles zero gracefully
+    yield AssistantTurn(text, tool_calls, 0, 0)
+
+
 def stream(
     model: str,
     system: str,
@@ -491,6 +585,9 @@ def stream(
 
     if prov["type"] == "anthropic":
         yield from stream_anthropic(api_key, model_name, system, messages, tool_schemas, config)
+    elif prov["type"] == "ollama":
+        base_url = prov.get("base_url", "http://localhost:11434")
+        yield from stream_ollama(base_url, model_name, system, messages, tool_schemas, config)
     else:
         import os as _os
         if provider_name == "custom":
