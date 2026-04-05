@@ -1023,8 +1023,59 @@ COMMANDS = {
     "voice":       cmd_voice,
     "exit":        cmd_exit,
     "quit":        cmd_exit,
-    "resume":      cmd_resume
+    "resume":      cmd_resume,
+    "circle":      lambda args, state, config: _cmd_loop(args, state, config),
 }
+
+
+def _cmd_loop(args: str, state, config):
+    """Ralph Loop: /loop [轮数] <verify_cmd> -- <task>
+    Examples:
+        /loop "pytest tests/" -- Fix all failing tests
+        /loop 10 "pytest tests/" -- Fix all failing tests
+    """
+    if not args.strip():
+        print("\033[33m用法: /loop [轮数] <verify_cmd> -- <task>\033[0m")
+        print('例如: /loop "pytest tests/" -- Fix all failing tests')
+        print('例如: /loop 10 "pytest tests/" -- 最多10轮修复测试')
+        print('不写轮数则无限循环，Ctrl+C 中断')
+        return
+
+    # 解析可选的轮数
+    max_rounds = 0
+    remaining = args.strip()
+    first_token = remaining.split(None, 1)[0]
+    if first_token.isdigit():
+        max_rounds = int(first_token)
+        remaining = remaining.split(None, 1)[1] if " " in remaining else ""
+
+    # 解析 verify_cmd -- task
+    if " -- " in remaining:
+        verify_cmd, task = remaining.split(" -- ", 1)
+    else:
+        parts = remaining.split(None, 1)
+        if len(parts) < 2:
+            print("\033[33m用法: /loop [轮数] <verify_cmd> -- <task>\033[0m")
+            return
+        verify_cmd, task = parts[0], parts[1]
+
+    verify_cmd = verify_cmd.strip().strip('"').strip("'")
+    task = task.strip()
+
+    from loop import improvement_loop
+    try:
+        result = improvement_loop(
+            task=task,
+            verify_cmd=verify_cmd,
+            config=config,
+            max_rounds=max_rounds,
+        )
+        if result["passed"]:
+            print(f"\033[32m✅ 循环完成，共 {result['rounds']} 轮\033[0m")
+        else:
+            print(f"\033[31m❌ 循环未通过，已尝试 {result['rounds']} 轮\033[0m")
+    except KeyboardInterrupt:
+        print(f"\n\033[33m⏹ 循环被中断\033[0m")
 
 
 def handle_slash(line: str, state, config) -> Union[bool, tuple]:
@@ -1248,7 +1299,12 @@ def main():
 
     # Apply CLI overrides first (so key check uses the right provider)
     if args.model:
-        config["model"] = args.model.replace(":", "/", 1)
+        # "anthropic:claude-opus-4-6" → "anthropic/claude-opus-4-6"
+        # But preserve colons in model tags like "ollama/qwen3.5:9b"
+        m = args.model
+        if "/" not in m and ":" in m:
+            m = m.replace(":", "/", 1)
+        config["model"] = m
     if args.accept_all:
         config["permission_mode"] = "accept-all"
     if args.verbose:

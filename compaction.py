@@ -180,7 +180,7 @@ def maybe_compact(state, config: dict) -> bool:
     """
     model = config.get("model", "")
     limit = get_context_limit(model)
-    threshold = limit * 0.7
+    threshold = limit * 0.85
 
     if estimate_tokens(state.messages) <= threshold:
         return False

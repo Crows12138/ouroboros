@@ -69,6 +69,12 @@ def run(
         depth: sub-agent nesting depth, 0 for top-level
         cancel_check: callable returning True to abort the loop early
     """
+    # Inject dynamic context into the first user message only
+    if not state.messages:
+        from context import build_context_message
+        ctx = build_context_message()
+        user_message = f"{ctx}\n\n{user_message}"
+
     # Append user turn in neutral format
     state.messages.append({"role": "user", "content": user_message})
 
@@ -101,9 +107,10 @@ def run(
             break
 
         # Record assistant turn in neutral format
+        # Ollama requires content to be a string, never None
         state.messages.append({
             "role":       "assistant",
-            "content":    assistant_turn.text,
+            "content":    assistant_turn.text or "",
             "tool_calls": assistant_turn.tool_calls,
         })
 

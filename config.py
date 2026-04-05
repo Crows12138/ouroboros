@@ -11,7 +11,7 @@ SESSIONS_DIR = CONFIG_DIR  / "sessions"
 MR_SESSION_DIR = SESSIONS_DIR / "mr_sessions"
 
 DEFAULTS = {
-    "model":            "claude-opus-4-6",
+    "model":            "ollama/qwen3.5-16k",
     "max_tokens":       8192,
     "permission_mode":  "auto",   # auto | accept-all | manual
     "verbose":          False,

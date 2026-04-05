@@ -102,7 +102,7 @@ PROVIDERS: dict[str, dict] = {
         "api_key_env": None,
         "base_url":   "http://localhost:11434/v1",
         "api_key":    "ollama",
-        "context_limit": 128000,
+        "context_limit": 16384,
         "models": [
             "llama3.3", "llama3.2", "phi4", "mistral", "mixtral",
             "qwen2.5-coder", "deepseek-r1", "gemma3",
@@ -163,6 +163,7 @@ _PREFIXES = [
     ("mistral",       "ollama"),
     ("phi",           "ollama"),
     ("gemma",         "ollama"),
+    ("qwen3.5",       "ollama"),
 ]
 
 
