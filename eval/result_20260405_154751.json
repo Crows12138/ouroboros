@@ -1,0 +1,27 @@
+{
+  "model": "ollama/qwen3.5-16k",
+  "max_rounds": 2,
+  "score": "2/3",
+  "pct": 66.66666666666666,
+  "results": [
+    {
+      "name": "task_01_logic_bug",
+      "passed": false,
+      "rounds": -1,
+      "duration": 117.78604435920715,
+      "error": "Error code: 400 - {'error': {'message': 'invalid message content type: <nil>', 'type': 'invalid_request_error', 'param': None, 'code': None}}"
+    },
+    {
+      "name": "task_02_data_processing",
+      "passed": true,
+      "rounds": 2,
+      "duration": 50.37695384025574
+    },
+    {
+      "name": "task_03_state_machine",
+      "passed": true,
+      "rounds": 1,
+      "duration": 58.01624369621277
+    }
+  ]
+}

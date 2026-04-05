@@ -1,0 +1,22 @@
+{
+  "model": "ollama/qwen3.5-16k",
+  "generations": 3,
+  "best_score": 66.66666666666666,
+  "history": [
+    {
+      "generation": 1,
+      "score": 66.66666666666666,
+      "phase": "eval"
+    },
+    {
+      "generation": 2,
+      "score": 33.33333333333333,
+      "phase": "eval"
+    },
+    {
+      "generation": 3,
+      "score": 100.0,
+      "phase": "eval"
+    }
+  ]
+}

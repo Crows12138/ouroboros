@@ -1,0 +1,26 @@
+{
+  "model": "ollama/qwen3.5-16k",
+  "max_rounds": 2,
+  "score": "3/3",
+  "pct": 100.0,
+  "results": [
+    {
+      "name": "task_01_logic_bug",
+      "passed": true,
+      "rounds": 1,
+      "duration": 39.95971393585205
+    },
+    {
+      "name": "task_02_data_processing",
+      "passed": true,
+      "rounds": 1,
+      "duration": 74.4828679561615
+    },
+    {
+      "name": "task_03_state_machine",
+      "passed": true,
+      "rounds": 1,
+      "duration": 25.76607036590576
+    }
+  ]
+}

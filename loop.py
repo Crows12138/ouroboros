@@ -124,6 +124,11 @@ def _run_agent_turn(prompt: str, state: AgentState, config: dict, system_prompt:
             if not event.permitted:
                 console.print(f"  [red]⛔ {event.name} 被拒绝[/red]")
                 event_log.append(f"[denied] {event.name}")
+            else:
+                # 显示工具返回结果（截断）
+                preview = event.result[:300].replace("\n", "\n    ")
+                console.print(f"    [dim]{preview}[/dim]")
+                event_log.append(f"[result] {event.result[:300]}")
     if text_buf.strip():
         console.print(text_buf.strip())
         event_log.append(f"[text] {text_buf.strip()[:300]}")
