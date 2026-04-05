@@ -155,6 +155,8 @@ def analyze_and_evolve(
 - 修改后 context.py 必须是合法的 Python，且 build_system_prompt() 和 build_context_message() 函数必须能正常调用返回字符串
 - 不要写死具体任务的解法
 
+提示：你可以用 SelfInspect("overview") 查看系统架构和限制，用 SelfInspect("context.py") 查看当前 prompt 的完整代码。
+
 思考：这个 agent 为什么会在某些任务上失败？它的工作流程缺少了什么？什么样的 prompt 能引导出更好的问题解决行为？"""
 
     state = AgentState()

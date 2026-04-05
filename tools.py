@@ -72,7 +72,7 @@ TOOL_SCHEMAS = [
             "type": "object",
             "properties": {
                 "command": {"type": "string"},
-                "timeout": {"type": "integer", "description": "Seconds before timeout (default 30)"},
+                "timeout": {"type": "integer", "description": "Seconds before timeout (default: no limit)"},
             },
             "required": ["command"],
         },
@@ -233,7 +233,7 @@ def _edit(file_path: str, old_string: str, new_string: str, replace_all: bool = 
         return f"Error: {e}"
 
 
-def _bash(command: str, timeout: int = 30) -> str:
+def _bash(command: str, timeout: int = None) -> str:
     try:
         r = subprocess.run(
             command, shell=True, capture_output=True, text=True,
@@ -417,7 +417,7 @@ def _register_builtins() -> None:
         ToolDef(
             name="Bash",
             schema=_schemas["Bash"],
-            func=lambda p, c: _bash(p["command"], p.get("timeout", 30)),
+            func=lambda p, c: _bash(p["command"], p.get("timeout")),
             read_only=False,
             concurrent_safe=False,
         ),
@@ -463,3 +463,30 @@ _register_builtins()
 
 # ── Memory tools (MemorySave, MemoryDelete, MemorySearch, MemoryList) ────
 import memory.tools as _memory_tools  # noqa: F401
+
+# ── Self-inspection tools ────────────────────────────────────────────────
+from self_inspect import get_self_report, get_file_summary
+
+register_tool(ToolDef(
+    name="SelfInspect",
+    schema={
+        "name": "SelfInspect",
+        "description": (
+            "Inspect this agent system's own architecture, constraints, and source code. "
+            "Use 'overview' for full system report, or provide a filename to see its structure."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "'overview' for full report, or a filename like 'context.py', 'loop.py', 'agent.py'",
+                },
+            },
+            "required": ["target"],
+        },
+    },
+    func=lambda p, c: get_self_report() if p["target"] == "overview" else get_file_summary(p["target"]),
+    read_only=True,
+    concurrent_safe=True,
+))

@@ -114,6 +114,11 @@ SYSTEM_PROMPT_STATIC = """\\
 - 每段回复聚焦一个主题
 - 包含行号引用
 
+# SELF-AWARENESS: 自我认知
+- 你有一个 SelfInspect 工具，可以查看自己的架构、代码和限制
+- 遇到不确定自己能不能做某事时，先 SelfInspect("overview") 了解自己的能力边界
+- 需要改进自己的行为时，可以 SelfInspect("context.py") 查看当前的 prompt
+
 # MANDATORY: 强制性要求
 - 绝对不要硬编码任务特定解法
 - 必须遵循工作流步骤
