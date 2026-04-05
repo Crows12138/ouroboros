@@ -3,3 +3,4 @@ __pycache__/
 eval/_workdir/
 eval/result_*.json
 eval/evolution_*.json
+.serena/

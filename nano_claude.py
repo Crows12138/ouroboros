@@ -54,8 +54,6 @@ from __future__ import annotations
 
 import os
 import sys
-if sys.platform == "win32":
-    os.system("")  # Enable ANSI escape codes on Windows CMD
 import json
 try:
     import readline
@@ -67,7 +65,7 @@ import textwrap
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Union
-import threading
+
 # ── Optional rich for markdown rendering ──────────────────────────────────
 try:
     from rich.console import Console
@@ -251,12 +249,7 @@ def cmd_model(args: str, _state, config) -> bool:
         info("  e.g. /model kimi:moonshot-v1-32k")
     else:
         # Accept both "ollama/model" and "ollama:model" syntax
-        # Only treat ':' as provider separator if left side is a known provider
-        m = args.strip()
-        if "/" not in m and ":" in m:
-            left, right = m.split(":", 1)
-            if left in PROVIDERS:
-                m = f"{left}/{right}"
+        m = args.strip().replace(":", "/", 1)
         config["model"] = m
         pname = detect_provider(m)
         ok(f"Model set to {m}  (provider: {pname})")
@@ -329,48 +322,22 @@ def save_latest(args: str, state, _config) -> bool:
     ok(f"Session saved to {path}")
     return True
 def cmd_load(args: str, state, _config) -> bool:
-    from config import SESSIONS_DIR, MR_SESSION_DIR
-    
-    path = None
+    from config import SESSIONS_DIR
     if not args.strip():
         # List available sessions
         sessions = sorted(SESSIONS_DIR.glob("*.json"))
-        if MR_SESSION_DIR.exists():
-            sessions.extend(sorted(MR_SESSION_DIR.glob("*.json")))
-        
         if not sessions:
             info("No saved sessions found.")
-            return True
-            
-        print(clr("  Select a session to load:", "cyan", "bold"))
-        for i, s in enumerate(sessions):
-            print(clr(f"  [{i+1}] ", "yellow") + s.name)
-            
-        print()
-        ans = input(clr("  Enter number (or press Enter to cancel) > ", "cyan")).strip()
-        if not ans.isdigit():
-            info("  Cancelled.")
-            return True
-            
-        idx = int(ans) - 1
-        if idx < 0 or idx >= len(sessions):
-            err("Invalid selection.")
-            return True
-            
-        path = sessions[idx]
-        
-    if not path:
-        fname = args.strip()
-        path = Path(fname) if "/" in fname or "\\" in fname else SESSIONS_DIR / fname
-        if not path.exists() and ("/" not in fname and "\\" not in fname):
-            alt_path = MR_SESSION_DIR / fname
-            if alt_path.exists():
-                path = alt_path
-                
-        if not path.exists():
-            err(f"File not found: {path} (checked {SESSIONS_DIR} and {MR_SESSION_DIR})")
-            return True
-        
+        else:
+            info("Saved sessions:")
+            for s in sessions:
+                info(f"  {s.name}")
+        return True
+    fname = args.strip()
+    path = Path(fname) if "/" in fname else SESSIONS_DIR / fname
+    if not path.exists():
+        err(f"File not found: {path}")
+        return True
     data = json.loads(path.read_text())
     state.messages = data.get("messages", [])
     state.turn_count = data.get("turn_count", 0)
@@ -1187,68 +1154,54 @@ def repl(config: dict, initial_prompt: str = None):
         print(clr("╰──────────────────────────────────────────────────╯", "dim"))
         print()
 
-    query_lock = threading.Lock()
-    
-    def run_query(user_input: str, is_background: bool = False):
+    def run_query(user_input: str):
         nonlocal verbose
-        
-        with query_lock:
-            verbose = config.get("verbose", False)
-    
-            # Rebuild system prompt each turn (picks up cwd changes, etc.)
-            system_prompt = build_system_prompt()
-            
-            if is_background:
-                print(clr("\n\n[Background Event Triggered]", "yellow"))
-    
-            print(clr("\n╭─ Claude ", "dim") + clr("●", "green") + clr(" ─────────────────────────", "dim"))
-            print(clr("│ ", "dim"), end="", flush=True)
-    
-            thinking_started = False
-    
-            for event in run(user_input, state, config, system_prompt):
-                if isinstance(event, TextChunk):
-                    stream_text(event.text)
-    
-                elif isinstance(event, ThinkingChunk):
-                    if verbose:
-                        if not thinking_started:
-                            print(clr("\n  [thinking]", "dim"))
-                            thinking_started = True
-                        stream_thinking(event.text, verbose)
-    
-                elif isinstance(event, ToolStart):
-                    flush_response()
-                    print_tool_start(event.name, event.inputs, verbose)
-    
-                elif isinstance(event, PermissionRequest):
-                    event.granted = ask_permission_interactive(event.description, config)
-    
-                elif isinstance(event, ToolEnd):
-                    print_tool_end(event.name, event.result, verbose)
-                    # Print prefix for next text
-                    print(clr("│ ", "dim"), end="", flush=True)
-    
-                elif isinstance(event, TurnDone):
-                    if verbose:
-                        print(clr(
-                            f"\n  [tokens: +{event.input_tokens} in / "
-                            f"+{event.output_tokens} out]", "dim"
-                        ))
+        verbose = config.get("verbose", False)
 
-            flush_response()
-            print(clr("╰──────────────────────────────────────────────", "dim"))
-            print()
-            
-            # If this was a background task, we redraw the prompt for the user
-            if is_background:
-                print(clr("\n[claude-code-local] ❯ ", "yellow"), end="", flush=True)
+        # Rebuild system prompt each turn (picks up cwd changes, etc.)
+        system_prompt = build_system_prompt()
 
+        print(clr("\n╭─ Claude ", "dim") + clr("●", "green") + clr(" ─────────────────────────", "dim"))
+        print(clr("│ ", "dim"), end="", flush=True)
+
+        thinking_started = False
+
+        for event in run(user_input, state, config, system_prompt):
+            if isinstance(event, TextChunk):
+                stream_text(event.text)
+
+            elif isinstance(event, ThinkingChunk):
+                if verbose:
+                    if not thinking_started:
+                        print(clr("\n  [thinking]", "dim"))
+                        thinking_started = True
+                    stream_thinking(event.text, verbose)
+
+            elif isinstance(event, ToolStart):
+                flush_response()
+                print_tool_start(event.name, event.inputs, verbose)
+
+            elif isinstance(event, PermissionRequest):
+                event.granted = ask_permission_interactive(event.description, config)
+
+            elif isinstance(event, ToolEnd):
+                print_tool_end(event.name, event.result, verbose)
+                # Print prefix for next text
+                print(clr("│ ", "dim"), end="", flush=True)
+
+            elif isinstance(event, TurnDone):
+                if verbose:
+                    print(clr(
+                        f"\n  [tokens: +{event.input_tokens} in / "
+                        f"+{event.output_tokens} out]", "dim"
+                    ))
+
+        flush_response()
+        print(clr("╰──────────────────────────────────────────────", "dim"))
+        print()
         # Drain any AskUserQuestion prompts raised during this turn
         from tools import drain_pending_questions
         drain_pending_questions()
-
-    config["_run_query_callback"] = lambda msg: run_query(msg, is_background=True)
 
     # ── Main loop ──
     if initial_prompt:

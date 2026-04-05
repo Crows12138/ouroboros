@@ -52,8 +52,7 @@ def load_config() -> dict:
 
 def save_config(cfg: dict):
     CONFIG_DIR.mkdir(exist_ok=True)
-    # Strip internal runtime keys (e.g. _run_query_callback) before saving
-    data = {k: v for k, v in cfg.items() if not k.startswith("_")}
+    data = dict(cfg)
     CONFIG_FILE.write_text(json.dumps(data, indent=2))
 
 
