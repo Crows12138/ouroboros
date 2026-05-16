@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 eval/_workdir/
+eval/_quixbugs/
 eval/result_*.json
 eval/evolution_*.json
 .serena/
